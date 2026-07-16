@@ -1825,6 +1825,7 @@ class Entity extends Eloquent implements EntityInterface
 
         $latest = $entity->select($positionColumn)
             ->where($parentIdColumn, '=', $entity->parent_id)
+            ->tap(fn ($q) => $entity->positionScope($q))
             ->latest($positionColumn)
             ->first();
 
@@ -1834,11 +1835,27 @@ class Entity extends Eloquent implements EntityInterface
     }
 
     /**
+     * Limits position-related queries to an additional scope.
+     *
+     * Subclasses may override this to constrain sibling ordering
+     * to a custom scope (e.g. a foreign key) when nodes share
+     * the same parent id.
+     *
+     * @param Builder $query
+     *
+     * @return Builder
+     */
+    protected function positionScope(Builder $query)
+    {
+        return $query;
+    }
+
+    /**
      * Reorders node's siblings when it is moved to another position or ancestor.
      *
      * @return void
      */
-    private function reorderSiblings()
+    protected function reorderSiblings()
     {
         $position = $this->getPositionColumn();
 
@@ -1847,6 +1864,7 @@ class Entity extends Eloquent implements EntityInterface
                 ->where($this->getKeyName(), '<>', $this->getKey())
                 ->where($this->getParentIdColumn(), '=', $this->previousParentId)
                 ->where($position, '>', $this->previousPosition)
+                ->tap(fn ($q) => $this->positionScope($q))
                 ->decrement($position);
         }
 
@@ -1854,6 +1872,7 @@ class Entity extends Eloquent implements EntityInterface
             ->sibling()
             ->where($this->getKeyName(), '<>', $this->getKey())
             ->where($position, '>=', $this->position)
+            ->tap(fn ($q) => $this->positionScope($q))
             ->increment($position);
     }
 
